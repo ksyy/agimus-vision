@@ -49,7 +49,8 @@ public:
 
     virtual size_t id() const = 0;
     
-    virtual bool analyseImage( const vpImage< unsigned char > &gray_image );
+    virtual bool analyseImage( const vpImage< unsigned char > &gray_image,
+                               const vpImage< float > &depth );
 
     virtual bool detect();
 

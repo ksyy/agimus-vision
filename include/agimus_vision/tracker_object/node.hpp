@@ -16,6 +16,9 @@
 #include <tf2_ros/transform_broadcaster.h>
 #include <tf2_ros/transform_listener.h>
 
+#include <message_filters/subscriber.h>
+#include <message_filters/time_synchronizer.h>
+
 #include <std_srvs/Trigger.h>
 #include <geometry_msgs/TransformStamped.h>
 #include <sensor_msgs/CameraInfo.h>
@@ -41,10 +44,13 @@ class Node
 
     // Names of the topics sending the images and infos
     std::string _image_topic;
+    std::string _depth_topic;
     std::string _camera_info_topic;
     
     uint32_t _queue_size;
-    ros::Subscriber _image_sub;
+    std::unique_ptr< message_filters::Subscriber<sensor_msgs::Image> > _image_sub;
+    std::unique_ptr< message_filters::Subscriber<sensor_msgs::Image> > _depth_sub;
+    std::unique_ptr< message_filters::TimeSynchronizer<sensor_msgs::Image, sensor_msgs::Image> > _image_depth_sync;
     ros::Subscriber _camera_info_sub;
     tf2_ros::Buffer _tf_buffer;
     tf2_ros::TransformListener _tf_listener;
@@ -61,6 +67,7 @@ class Node
     std_msgs::Header _image_header;
     vpImage<vpRGBa> _image;
     vpImage<unsigned char> _gray_image;
+    vpImage<float> _depth;
     bool _image_new;
 
     // Classes called to detect some object in the image and then track it
@@ -102,7 +109,7 @@ public:
     void cameraInfoCallback(const sensor_msgs::CameraInfoConstPtr& camera_info);
 
     /// Callback to use the images
-    void frameCallback(const sensor_msgs::ImageConstPtr& image);
+    void frameCallback(const sensor_msgs::ImageConstPtr& image, const sensor_msgs::ImageConstPtr& depth);
 
     /// Process an image.
     void imageProcessing ();

@@ -3,13 +3,15 @@
 #include <visp3/core/vpColor.h>
 #include <visp3/core/vpDisplay.h>
 #include <visp3/core/vpPoint.h>
-#include <visp3/core/vpMeterPixelConversion.h>
+#include <visp3/core/vpPixelMeterConversion.h>
+#include <visp3/vision/vpPose.h>
 
 namespace agimus_vision {
 namespace tracker_object {
 
 // Init common tag detector
 vpDetectorAprilTag DetectorAprilTag::Apriltag_detector{};
+vpImage<float> DetectorAprilTag::_depth{};
 
 
 DetectorAprilTag::DetectorAprilTag( const vpCameraParameters &cam_parameters, const int tag_id, const double tag_size_meters )
@@ -18,8 +20,9 @@ DetectorAprilTag::DetectorAprilTag( const vpCameraParameters &cam_parameters, co
   , _tag_size_meters{ tag_size_meters }
 {}
 
-bool DetectorAprilTag::analyseImage( const vpImage< unsigned char > &gray_image )
+bool DetectorAprilTag::analyseImage( const vpImage< unsigned char > &gray_image, const vpImage< float > &depth )
 {
+    _depth = depth;
     return Apriltag_detector.detect( gray_image );
 }
 
@@ -86,6 +89,40 @@ void DetectorAprilTag::drawDebug( vpImage< vpRGBa > &image ) const
     vpDisplay::displayArrow( image, pointA, pointC, vpColor::green );
     vpDisplay::displayArrow( image, pointA, pointD, vpColor::blue );
     */
+}
+
+bool DetectorAprilTag::computePose()
+{
+    if( _state == no_object )
+        return false;
+
+    vpPose pose{};
+    std::vector< vpPoint > points{ compute3DPoints() };
+
+    // Compute the 2D coord. of the points (in meters) to match the 3D coord. for the pose estimation 
+    for( unsigned int i{ 0 } ; i < points.size() ; i++ ) 
+    {
+        double x{ 0. }, y{ 0. };
+        vpPixelMeterConversion::convertPointWithoutDistortion( _cam_parameters, _image_points[ i ], x, y );
+        
+        // x, y are the coordinates in the image plane, oX, oY, oZ in the world, and X, Y, Z in the camera ref. frame
+        points[ i ].set_x( x );
+        points[ i ].set_y( y );
+        pose.addPoint( points[ i ] );
+    }
+
+    if( _state == newly_acquired_object )
+    {
+        vpPose::computePoseRGBD( _depth, _image_points, _cam_parameters, 
+                                 _tag_size_meters, _cMo );
+ 
+        return true;
+    }
+ 
+    assert(_state == already_acquired_object);
+    pose.computePose( vpPose::VIRTUAL_VS, _cMo );
+    _error = pose.computeResidual( _cMo );
+    return true;
 }
 
 std::vector< vpPoint > DetectorAprilTag::compute3DPoints() const

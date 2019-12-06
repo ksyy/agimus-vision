@@ -18,7 +18,8 @@ DetectorChessboard::DetectorChessboard( const vpCameraParameters &cam_parameters
   , _chessboard_square_size_meters{ chessboard_square_size_meters }
 {}
 
-bool DetectorChessboard::analyseImage( const vpImage< unsigned char > &gray_image )
+bool DetectorChessboard::analyseImage( const vpImage< unsigned char > &gray_image,
+                                       const vpImage< float > &/*depth*/ )
 {
   _image_points.clear();
   _image_points_cv.clear();

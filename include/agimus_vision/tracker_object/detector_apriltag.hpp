@@ -10,17 +10,19 @@ namespace tracker_object {
 
 class DetectorAprilTag : public Detector
 {
-
-
     const int _tag_id;
     const double _tag_size_meters;
 
+    static vpImage<float> _depth;
+
+    bool computePose();
+    
     std::vector< vpPoint > compute3DPoints() const;
 
 public:
     DetectorAprilTag( const vpCameraParameters &cam_parameters, const int tag_id, const double tag_size_meters );
 
-    bool analyseImage( const vpImage< unsigned char > &gray_image );
+    bool analyseImage( const vpImage< unsigned char > &gray_image, const vpImage< float > &depth );
 
     bool detect();
 

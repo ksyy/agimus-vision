@@ -12,6 +12,8 @@
 #include <ros/console.h>
 #include <sensor_msgs/image_encodings.h>
 
+
+
 #include <visp3/gui/vpDisplayX.h>
 #include <visp3/core/vpImageConvert.h>
 #include <visp3/core/vpImagePoint.h>
@@ -64,6 +66,7 @@ Node::Node()
 {
     // Get parameters for the node
     _node_handle.param<std::string>("imageTopic", _image_topic, "/camera/rgb/image_rect_color");
+    _node_handle.param<std::string>("depthTopic", _depth_topic, "/rgbd/depth_registered/hw_registered/image_rect");
     _node_handle.param<std::string>("cameraInfoTopic", _camera_info_topic, "/camera/rgb/camera_info");
 
     // Initialize camera parameters
@@ -75,8 +78,10 @@ Node::Node()
     cameraInfoCallback(cam_info_msg);
     
     // Use those parameters to create the camera 
-    _image_sub = _node_handle.subscribe(_image_topic, _queue_size,
-        &Node::frameCallback, this);
+    _image_sub.reset(new message_filters::Subscriber<sensor_msgs::Image>{_node_handle, _image_topic, _queue_size}); 
+    _depth_sub.reset(new message_filters::Subscriber<sensor_msgs::Image>{_node_handle, _depth_topic, _queue_size}); 
+    _image_depth_sync.reset(new message_filters::TimeSynchronizer<sensor_msgs::Image, sensor_msgs::Image>{*_image_sub, *_depth_sub, _queue_size*5});
+    _image_depth_sync->registerCallback(std::bind(&Node::frameCallback, this, std::placeholders::_1, std::placeholders::_2));
     _camera_info_sub = _node_handle.subscribe(_camera_info_topic, _queue_size,
         &Node::cameraInfoCallback, this);
 
@@ -136,12 +141,13 @@ void Node::cameraInfoCallback(const sensor_msgs::CameraInfoConstPtr& camera_info
     _cam_parameters = visp_bridge::toVispCameraParameters(*camera_info);
 }
 
-void Node::frameCallback(const sensor_msgs::ImageConstPtr& image)
+void Node::frameCallback(const sensor_msgs::ImageConstPtr& image, const sensor_msgs::ImageConstPtr& depth)
 {
     std::lock_guard<std::mutex> lock(_image_lock);
     _image_header = image->header;
     
     _image = vpImage<vpRGBa>{ image->height, image->width };
+    _depth = vpImage<float>{ depth->height, depth->width };
     for(unsigned int i{ 0 } ; i < _image.getHeight() ; ++i )
         for(unsigned int j{ 0 } ; j < _image.getWidth() ; ++j)
         {
@@ -158,6 +164,10 @@ void Node::frameCallback(const sensor_msgs::ImageConstPtr& image)
             else
                 _image[i][j] = vpRGBa{0, 0, 0};
         }
+    
+    for(unsigned int i{ 0 } ; i < _depth.getHeight() ; ++i )
+        for(unsigned int j{ 0 } ; j < _depth.getWidth() ; ++j)
+            _depth[i][j] = float(depth->data[i * image->step + j * 4]);
 
     vpImageConvert::convert(_image, _gray_image);
 
@@ -180,8 +190,10 @@ void Node::imageProcessing()
       vpDisplay::display(_image);
     }
 
-    if( !_detectors.empty() && (_detectors.begin())->second.detector->analyseImage( _gray_image ) )
+    if( !_detectors.empty() )
     {
+      _detectors.begin()->second.detector->analyseImage( _gray_image, _depth );
+
       agimus_vision::ImageDetectionResult result;
       result.header = _image_header;
 

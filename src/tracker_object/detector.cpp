@@ -17,7 +17,8 @@ Detector::Detector( const vpCameraParameters &cam_parameters )
   , _pose_thr (1e-3)
 {}
 
-bool Detector::analyseImage( const vpImage< unsigned char > &/*gray_image*/ )
+bool Detector::analyseImage( const vpImage< unsigned char > &/*gray_image*/, 
+                             const vpImage< float > &/*depth*/ )
 {
     return false;
 }

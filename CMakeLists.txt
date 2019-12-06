@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 2.8.3)
+cmake_minimum_required(VERSION 3.5)
 
 SET(PROJECT_NAME agimus_vision)
 SET(PROJECT_DESCRIPTION "Computer vision for Agimus")
@@ -19,6 +19,8 @@ if(NOT COMPILER_SUPPORTS_CXX11)
   message(FATAL "This project needs support for C++ 11.")
 endif()
 
+find_package(VISP 3.2.1 EXACT REQUIRED)
+
 find_package(catkin REQUIRED COMPONENTS
   roscpp
   roslib
@@ -32,10 +34,16 @@ find_package(catkin REQUIRED COMPONENTS
   tf2_ros
   tf2_geometry_msgs
 )
+FOREACH(lib ${catkin_LIBRARIES})
+    IF(lib MATCHES ".+libvisp.+")
+        IF(NOT lib MATCHES ".+bridge.+")
+            LIST(REMOVE_ITEM catkin_LIBRARIES ${lib})
+        ENDIF()
+    ENDIF()
+ENDFOREACH()
 
 find_package(OpenCV REQUIRED)
 
-ADD_REQUIRED_DEPENDENCY(visp)
 
 add_message_files(
   FILES

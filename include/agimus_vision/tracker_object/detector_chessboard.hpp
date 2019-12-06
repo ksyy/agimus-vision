@@ -28,7 +28,8 @@ public:
       return 0;
     }
 
-    bool analyseImage( const vpImage< unsigned char > &gray_image );
+    bool analyseImage( const vpImage< unsigned char > &gray_image,
+                       const vpImage< float > &depth );
 
     bool detect();
 
